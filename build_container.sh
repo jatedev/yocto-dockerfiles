@@ -18,14 +18,15 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 set -e
+set -x
 
 # DISTRO_TO_BUILD is essentially the prefix to the "base" and "builder"
 # directories you plan to use. i.e. "fedora-23" or "ubuntu-16.04"
 
 # First build the base
 TAG=$DISTRO_TO_BUILD-base
-dockerdir=`find -name $TAG`
-workdir=`mktemp --tmpdir -d tmp-$TAG.XXX`
+dockerdir=`find . -name $TAG`
+workdir=`mktemp -d -t tmp-$TAG`
 
 cp -r $dockerdir $workdir
 workdir=$workdir/$TAG
@@ -44,18 +45,18 @@ docker build \
        --build-arg no_proxy=$no_proxy \
        --build-arg NO_PROXY=$no_proxy \
        -t $REPO:$TAG .
-rm $workdir -rf
+rm -rf $workdir
 cd -
 
 # Now build the builder. We copy things to a temporary directory so that we
 # can modify the Dockerfile to use whatever REPO is in the environment.
 TAG=$DISTRO_TO_BUILD-builder
-workdir=`mktemp --tmpdir -d tmp-$TAG.XXX`
+workdir=`mktemp -d -t tmp-$TAG`
 
 # use the builder template to populate the distro specific Dockerfile
 cp dockerfiles/templates/Dockerfile.builder $workdir/Dockerfile
 cp distro-entry.sh $workdir
-sed -i "s/DISTRO_TO_BUILD/$DISTRO_TO_BUILD/g" $workdir/Dockerfile
+sed -i -e "s/DISTRO_TO_BUILD/$DISTRO_TO_BUILD/g" "$workdir/Dockerfile"
 
 cp helpers/runbitbake.py $workdir
 cd $workdir
@@ -74,9 +75,10 @@ docker build \
        -t $REPO:$TAG .
 cd -
 
+# Disable tests
 # base tests
-./tests/container/vnc-test.sh $REPO:$DISTRO_TO_BUILD-base
+#./tests/container/vnc-test.sh $REPO:$DISTRO_TO_BUILD-base
 # builder tests
-./tests/container/smoke.sh $REPO:$DISTRO_TO_BUILD-builder
+#./tests/container/smoke.sh $REPO:$DISTRO_TO_BUILD-builder
 
-rm $workdir -rf
+rm -rf $workdir
